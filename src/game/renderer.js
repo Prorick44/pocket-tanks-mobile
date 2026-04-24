@@ -47,6 +47,12 @@ export function draw(ctx, g) {
     ctx.moveTo(t.x, t.y - 12);
     ctx.lineTo(nx, ny);
     ctx.stroke();
+    // ❤️ floating health bar
+    ctx.fillStyle = "#000";
+    ctx.fillRect(t.x - 20, t.y - 25, 40, 5);
+
+    ctx.fillStyle = "#22c55e";
+    ctx.fillRect(t.x - 20, t.y - 25, (t.health / 100) * 40, 5);
   });
 
   // trajectory

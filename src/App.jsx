@@ -9,7 +9,9 @@ import { explode } from "./game/effects";
 export default function App() {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
+
   const [winner, setWinner] = useState(null);
+  const [gameUI, setGameUI] = useState({});
 
   const engineRef = useRef({
     state: initGame(),
@@ -20,6 +22,7 @@ export default function App() {
 
   const engine = () => engineRef.current;
 
+  /* ================= FIRE ================= */
   function fire() {
     const g = engine().state;
     if (g.projectile || g.winner) return;
@@ -37,9 +40,10 @@ export default function App() {
     };
 
     t.recoil = 6;
-    g.shake = 4;
+    g.shake = 5;
   }
 
+  /* ================= UPDATE ================= */
   function update() {
     const eng = engine();
     const g = eng.state;
@@ -64,11 +68,21 @@ export default function App() {
       }
     }
 
+    // sync UI
+    setGameUI({
+      playerHP: Math.max(0, g.tanks[0].health),
+      aiHP: Math.max(0, g.tanks[1].health),
+      wind: g.wind,
+      weapon: g.weapon,
+      turn: g.turn,
+    });
+
     if (g.winner && winner !== g.winner) {
       setWinner(g.winner);
     }
   }
 
+  /* ================= AIM CONTROLS ================= */
   useEffect(() => {
     const canvas = canvasRef.current;
 
@@ -116,10 +130,9 @@ export default function App() {
     canvas.addEventListener("touchstart", start);
     canvas.addEventListener("touchmove", move);
     canvas.addEventListener("touchend", end);
-
-    return () => {};
   }, []);
 
+  /* ================= GAME LOOP ================= */
   useEffect(() => {
     const ctx = canvasRef.current.getContext("2d");
 
@@ -133,16 +146,71 @@ export default function App() {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
+  /* ================= LANDSCAPE ENFORCE ================= */
+  const isPortrait = window.innerHeight > window.innerWidth;
+
+  if (isPortrait) {
+    return (
+      <div
+        style={{
+          color: "white",
+          height: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "#000",
+          textAlign: "center",
+        }}
+      >
+        Rotate your device 🔄 for better gameplay
+      </div>
+    );
+  }
+
   return (
-    <div style={{ background: "#000", height: "100vh" }}>
+    <div
+      style={{
+        background: "#000",
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      {/* 🧠 TOP HUD */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          padding: "10px",
+          color: "#fff",
+        }}
+      >
+        <div>PLAYER ❤️ {gameUI.playerHP}</div>
+        <div>WIND 🌬️ {gameUI.wind?.toFixed(2)}</div>
+        <div>AI ❤️ {gameUI.aiHP}</div>
+      </div>
+
+      {/* 🎮 GAME */}
       <canvas
         ref={canvasRef}
         width={WIDTH}
         height={600}
-        style={{ width: "100%" }}
+        style={{
+          width: "100%",
+          flex: 1,
+          touchAction: "none", // ✅ prevents gestures
+        }}
       />
 
-      <div style={{ padding: "10px" }}>
+      {/* 🔫 WEAPONS */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-around",
+          padding: "10px",
+          background: "#111",
+        }}
+      >
         <button onClick={() => (engine().state.weapon = 0)}>Cannon</button>
         <button onClick={() => (engine().state.weapon = 1)}>Missile</button>
         <button onClick={() => (engine().state.weapon = 2)}>Cluster</button>
@@ -150,8 +218,11 @@ export default function App() {
         <button onClick={() => (engine().state.weapon = 4)}>Laser</button>
       </div>
 
+      {/* 🏆 WINNER */}
       {winner && (
-        <div style={{ color: "#fff", textAlign: "center" }}>{winner} WINS</div>
+        <div style={{ color: "#fff", textAlign: "center", padding: "10px" }}>
+          {winner} WINS 🏆
+        </div>
       )}
     </div>
   );
