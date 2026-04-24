@@ -4,20 +4,18 @@ import { initGame } from "./game/initGame";
 import { aiTurn } from "./game/ai";
 import { updateProjectile } from "./game/physics";
 import { draw } from "./game/renderer";
-import { explode } from "./game/effects";
 
 export default function App() {
   const canvasRef = useRef(null);
   const rafRef = useRef(null);
 
   const [winner, setWinner] = useState(null);
-  const [gameUI, setGameUI] = useState({});
 
   const engineRef = useRef({
     state: initGame(),
-    aiLock: false,
     aiming: false,
     start: null,
+    aiLock: false,
   });
 
   const engine = () => engineRef.current;
@@ -25,6 +23,7 @@ export default function App() {
   /* ================= FIRE ================= */
   function fire() {
     const g = engine().state;
+
     if (g.projectile || g.winner) return;
 
     const isPlayer = g.turn === "player";
@@ -37,11 +36,10 @@ export default function App() {
       y: t.y - 10,
       vx: Math.cos(angle) * g.power,
       vy: -Math.sin(angle) * g.power,
-      trail: [],
     };
 
-    t.recoil = 8;
-    g.shake = 8;
+    t.recoil = 6;
+    g.shake = 10;
   }
 
   /* ================= UPDATE ================= */
@@ -49,20 +47,19 @@ export default function App() {
     const eng = engine();
     const g = eng.state;
 
-    g.shake = Math.max(0, g.shake - 0.25);
+    g.shake = Math.max(0, g.shake - 0.3);
 
     if (g.projectile) {
-      g.projectile.trail.push({ x: g.projectile.x, y: g.projectile.y });
-      if (g.projectile.trail.length > 12) g.projectile.trail.shift();
+      const alive = updateProjectile(g);
 
-      const flying = updateProjectile(g, explode);
-
-      if (!flying && !g.projectile && !g.winner) {
+      // turn switch
+      if (!alive && !g.projectile && !g.winner) {
         setTimeout(() => {
           g.turn = g.turn === "player" ? "ai" : "player";
 
           if (g.turn === "ai" && !eng.aiLock) {
             eng.aiLock = true;
+
             setTimeout(() => {
               aiTurn(g, fire);
               eng.aiLock = false;
@@ -72,39 +69,35 @@ export default function App() {
       }
     }
 
-    setGameUI({
-      playerHP: Math.max(0, g.tanks[0].health),
-      aiHP: Math.max(0, g.tanks[1].health),
-      wind: g.wind,
-      weapon: g.weapon,
-      turn: g.turn,
-    });
-
     if (g.winner && winner !== g.winner) {
       setWinner(g.winner);
     }
   }
 
-  /* ================= INPUT ================= */
+  /* ================= MOBILE INPUT ================= */
   useEffect(() => {
     const canvas = canvasRef.current;
 
     const getPos = (e) => {
       const rect = canvas.getBoundingClientRect();
       const t = e.touches ? e.touches[0] : e;
+
       return {
-        x: (t.clientX - rect.left) * (WIDTH / rect.width),
-        y: (t.clientY - rect.top) * (600 / rect.height),
+        x: ((t.clientX - rect.left) / rect.width) * WIDTH,
+        y: ((t.clientY - rect.top) / rect.height) * 600,
       };
     };
 
     const start = (e) => {
+      e.preventDefault();
       if (engine().state.turn !== "player") return;
+
       engine().aiming = true;
       engine().start = getPos(e);
     };
 
     const move = (e) => {
+      e.preventDefault();
       if (!engine().aiming) return;
 
       const g = engine().state;
@@ -117,182 +110,157 @@ export default function App() {
         0,
         Math.min(180, (Math.atan2(dy, dx) * 180) / Math.PI),
       );
-      g.power = Math.max(2, Math.min(20, Math.hypot(dx, dy) * 0.1));
+
+      g.power = Math.max(2, Math.min(20, Math.hypot(dx, dy) * 0.08));
     };
 
-    const end = () => {
+    const end = (e) => {
+      e.preventDefault();
       if (!engine().aiming) return;
+
       engine().aiming = false;
       fire();
     };
 
+    canvas.addEventListener("touchstart", start, { passive: false });
+    canvas.addEventListener("touchmove", move, { passive: false });
+    canvas.addEventListener("touchend", end, { passive: false });
+
     canvas.addEventListener("mousedown", start);
     canvas.addEventListener("mousemove", move);
     canvas.addEventListener("mouseup", end);
-
-    canvas.addEventListener("touchstart", start);
-    canvas.addEventListener("touchmove", move);
-    canvas.addEventListener("touchend", end);
   }, []);
 
-  /* ================= LOOP ================= */
+  /* ================= GAME LOOP ================= */
   useEffect(() => {
-    const ctx = canvasRef.current.getContext("2d");
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d");
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1;
+
+      canvas.width = WIDTH * dpr;
+      canvas.height = 600 * dpr;
+
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    };
+
+    resize();
+    window.addEventListener("resize", resize);
 
     const loop = () => {
       update();
 
       const g = engine().state;
 
-      // screen shake
       ctx.save();
-      const shakeX = (Math.random() - 0.5) * g.shake;
-      const shakeY = (Math.random() - 0.5) * g.shake;
-      ctx.translate(shakeX, shakeY);
+
+      // shake effect
+      const s = g.shake || 0;
+      ctx.translate((Math.random() - 0.5) * s, (Math.random() - 0.5) * s);
 
       draw(ctx, g);
+
       ctx.restore();
 
       rafRef.current = requestAnimationFrame(loop);
     };
 
     rafRef.current = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(rafRef.current);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      window.removeEventListener("resize", resize);
+    };
   }, []);
 
+  /* ================= LANDSCAPE LOCK ================= */
   const isPortrait = window.innerHeight > window.innerWidth;
 
   if (isPortrait) {
-    return <div style={styles.rotate}>Rotate your device 🔄</div>;
+    return (
+      <div
+        style={{
+          color: "#fff",
+          height: "100vh",
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          background: "#000",
+          textAlign: "center",
+        }}
+      >
+        Rotate your device 🔄 for best experience
+      </div>
+    );
   }
 
-  const weaponNames = ["Cannon", "Missile", "Cluster", "Nuke", "Laser"];
-
+  /* ================= UI ================= */
   return (
-    <div style={styles.root}>
+    <div
+      style={{
+        background: "#000",
+        height: "100vh",
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {/* HUD */}
-      <div style={styles.hud}>
-        <Health label="PLAYER" hp={gameUI.playerHP} color="#00ff88" />
-        <div style={styles.centerHUD}>
-          <div>🌬️ {gameUI.wind?.toFixed(2)}</div>
-          <div style={{ opacity: 0.7 }}>{weaponNames[gameUI.weapon]}</div>
-        </div>
-        <Health label="AI" hp={gameUI.aiHP} color="#ff4d4d" />
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          padding: 10,
+          color: "#fff",
+          fontFamily: "sans-serif",
+        }}
+      >
+        <div>PLAYER ❤️ {engine().state.tanks[0].health}</div>
+        <div>WIND 🌬️ {engine().state.wind?.toFixed(2)}</div>
+        <div>AI ❤️ {engine().state.tanks[1].health}</div>
       </div>
 
-      {/* CANVAS */}
+      {/* GAME */}
       <canvas
         ref={canvasRef}
-        width={WIDTH}
-        height={600}
-        style={styles.canvas}
+        style={{
+          width: "100%",
+          flex: 1,
+          touchAction: "none",
+        }}
       />
 
-      {/* WEAPONS */}
-      <div style={styles.weaponBar}>
-        {weaponNames.map((w, i) => (
-          <button
-            key={i}
-            onClick={() => (engine().state.weapon = i)}
-            style={{
-              ...styles.weaponBtn,
-              background: gameUI.weapon === i ? "#00ff88" : "#222",
-              transform: gameUI.weapon === i ? "scale(1.1)" : "scale(1)",
-            }}
-          >
-            {w}
-          </button>
-        ))}
+      {/* WEAPON BAR */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-around",
+          padding: 10,
+          background: "#111",
+        }}
+      >
+        <button onClick={() => (engine().state.weapon = 0)}>Cannon</button>
+        <button onClick={() => (engine().state.weapon = 1)}>Missile</button>
+        <button onClick={() => (engine().state.weapon = 2)}>Cluster</button>
+        <button onClick={() => (engine().state.weapon = 3)}>Nuke</button>
+        <button onClick={() => (engine().state.weapon = 4)}>Laser</button>
       </div>
 
       {/* WINNER */}
       {winner && (
-        <div style={styles.winner}>🏆 {winner.toUpperCase()} WINS</div>
+        <div
+          style={{
+            position: "absolute",
+            top: "40%",
+            width: "100%",
+            textAlign: "center",
+            fontSize: 32,
+            color: "#fff",
+          }}
+        >
+          🏆 {winner} WINS
+        </div>
       )}
     </div>
   );
 }
-
-/* ================= UI COMPONENT ================= */
-function Health({ label, hp, color }) {
-  return (
-    <div style={{ width: 140 }}>
-      <div style={{ fontSize: 12 }}>{label}</div>
-      <div style={styles.hpBarBg}>
-        <div
-          style={{
-            ...styles.hpBarFill,
-            width: `${hp}%`,
-            background: color,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
-/* ================= STYLES ================= */
-const styles = {
-  root: {
-    height: "100vh",
-    background: "radial-gradient(circle, #111, #000)",
-    display: "flex",
-    flexDirection: "column",
-  },
-  hud: {
-    display: "flex",
-    justifyContent: "space-between",
-    padding: 10,
-    color: "#fff",
-    alignItems: "center",
-  },
-  centerHUD: {
-    textAlign: "center",
-    fontSize: 14,
-  },
-  canvas: {
-    width: "100%",
-    flex: 1,
-    touchAction: "none",
-  },
-  weaponBar: {
-    display: "flex",
-    justifyContent: "space-around",
-    padding: 10,
-    background: "#111",
-  },
-  weaponBtn: {
-    color: "#fff",
-    border: "none",
-    padding: "8px 10px",
-    borderRadius: 6,
-    transition: "0.2s",
-  },
-  hpBarBg: {
-    height: 8,
-    background: "#333",
-    borderRadius: 4,
-    overflow: "hidden",
-  },
-  hpBarFill: {
-    height: "100%",
-    transition: "0.3s",
-  },
-  winner: {
-    position: "absolute",
-    top: "40%",
-    width: "100%",
-    textAlign: "center",
-    fontSize: 32,
-    color: "#fff",
-    animation: "pop 0.6s ease-out",
-  },
-  rotate: {
-    color: "#fff",
-    height: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    background: "#000",
-  },
-};
