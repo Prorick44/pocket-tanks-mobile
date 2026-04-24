@@ -15,10 +15,14 @@ export default function App() {
   const rafRef = useRef(null);
 
   const engineRef = useRef({
-    state: initGame(),
+    state: {
+      ...initGame(),
+      wind: Math.random() * 0.2 - 0.1,
+      particles: [],
+      shake: 0,
+    },
     scene: SCENE.PLAY,
     aiLock: false,
-    didExplode: false,
     touchStart: null,
     lastFireTime: 0,
   });
@@ -66,6 +70,7 @@ export default function App() {
 
     if (g.winner) return;
 
+    g.wind = Math.random() * 0.3 - 0.15; // 🌪 new wind every turn
     g.turn = g.lastTurn === "player" ? "ai" : "player";
 
     if (g.turn === "ai" && !e.aiLock) {
@@ -74,20 +79,8 @@ export default function App() {
       setTimeout(() => {
         aiTurn(g, fire);
         e.aiLock = false;
-      }, 600);
+      }, 700);
     }
-  }
-
-  /* ================= HIT ================= */
-
-  function checkDirectHit(g) {
-    const p = g.projectile;
-    if (!p) return null;
-
-    return g.tanks.find(
-      (t) =>
-        p.x > t.x - 20 && p.x < t.x + 20 && p.y > t.y - 10 && p.y < t.y + 10,
-    );
   }
 
   /* ================= EXPLOSION ================= */
@@ -96,17 +89,29 @@ export default function App() {
     const e = engine();
     const g = e.state;
 
-    if (e.didExplode) return;
-    e.didExplode = true;
-
     const w = WEAPONS[g.weapon];
 
+    // Damage
     g.tanks.forEach((t) => {
       const d = Math.hypot(t.x - x, t.y - y);
       if (d < w.radius) {
         t.health -= w.damage * (1 - d / w.radius);
       }
     });
+
+    // 💥 particles
+    for (let i = 0; i < 25; i++) {
+      g.particles.push({
+        x,
+        y,
+        vx: Math.random() * 4 - 2,
+        vy: Math.random() * -4,
+        life: 30,
+      });
+    }
+
+    // 🎥 screen shake
+    g.shake = 10;
 
     g.projectile = null;
 
@@ -117,6 +122,26 @@ export default function App() {
     else engine().scene = SCENE.OVER;
   }
 
+  /* ================= HIT ================= */
+
+  function checkDirectHit(g) {
+    const p = g.projectile;
+    if (!p) return false;
+
+    for (let t of g.tanks) {
+      if (
+        p.x > t.x - 20 &&
+        p.x < t.x + 20 &&
+        p.y > t.y - 10 &&
+        p.y < t.y + 10
+      ) {
+        explode(p.x, p.y);
+        return true;
+      }
+    }
+    return false;
+  }
+
   /* ================= UPDATE ================= */
 
   function update() {
@@ -125,24 +150,33 @@ export default function App() {
 
     if (e.scene !== SCENE.PLAY) return;
 
+    // projectile
     if (g.projectile) {
-      e.didExplode = false;
+      g.projectile.vx += g.wind; // 🌪 wind effect
 
-      const hit = checkDirectHit(g);
-      if (hit) {
-        explode(g.projectile.x, g.projectile.y);
-        return;
-      }
+      if (checkDirectHit(g)) return;
 
       const flying = updateProjectile(g, explode);
 
-      if (!flying && !g.projectile && !e.didExplode) {
+      if (!flying && !g.projectile) {
         nextTurn();
       }
     }
+
+    // particles
+    g.particles = g.particles.filter((p) => p.life > 0);
+    g.particles.forEach((p) => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.2;
+      p.life--;
+    });
+
+    // shake decay
+    if (g.shake > 0) g.shake--;
   }
 
-  /* ================= TOUCH CONTROLS ================= */
+  /* ================= TOUCH ================= */
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -173,9 +207,7 @@ export default function App() {
       g.power = clamp(Math.hypot(dx, dy) * 0.1, 2, 20);
     };
 
-    const end = () => {
-      engine().touchStart = null;
-    };
+    const end = () => (engine().touchStart = null);
 
     canvas.addEventListener("touchstart", start);
     canvas.addEventListener("touchmove", move);
@@ -188,23 +220,46 @@ export default function App() {
     };
   }, []);
 
-  /* ================= GAME LOOP ================= */
+  /* ================= LOOP ================= */
 
   useEffect(() => {
     const ctx = canvasRef.current.getContext("2d");
 
     const loop = () => {
       update();
-      draw(ctx, engine().state);
+
+      const g = engine().state;
+
+      // 🎥 apply shake
+      if (g.shake > 0) {
+        ctx.save();
+        ctx.translate(
+          Math.random() * g.shake - g.shake / 2,
+          Math.random() * g.shake - g.shake / 2,
+        );
+      }
+
+      draw(ctx, g);
+
+      // draw particles
+      ctx.fillStyle = "orange";
+      g.particles.forEach((p) => {
+        ctx.fillRect(p.x, p.y, 2, 2);
+      });
+
+      // reset shake
+      if (g.shake > 0) ctx.restore();
+
       rafRef.current = requestAnimationFrame(loop);
     };
 
     rafRef.current = requestAnimationFrame(loop);
-
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
   /* ================= UI ================= */
+
+  const g = engine().state;
 
   return (
     <div
@@ -222,6 +277,33 @@ export default function App() {
         style={{ width: "100%", flex: 1, touchAction: "none" }}
       />
 
+      {/* HUD */}
+      <div style={{ color: "#fff", textAlign: "center", padding: "5px" }}>
+        Angle: {g.angle.toFixed(0)} | Power: {g.power.toFixed(1)} | Wind:{" "}
+        {g.wind.toFixed(2)}
+      </div>
+
+      {/* HEALTH */}
+      <div style={{ display: "flex" }}>
+        <div
+          style={{
+            flex: 1,
+            background: "red",
+            height: "10px",
+            width: `${g.tanks[0].health}%`,
+          }}
+        />
+        <div
+          style={{
+            flex: 1,
+            background: "blue",
+            height: "10px",
+            width: `${g.tanks[1].health}%`,
+          }}
+        />
+      </div>
+
+      {/* CONTROLS */}
       <div
         style={{
           display: "flex",
@@ -230,8 +312,18 @@ export default function App() {
           background: "#111",
         }}
       >
-        <button onClick={() => (engine().state.weapon = 0)}>Cannon</button>
-        <button onClick={() => (engine().state.weapon = 1)}>Missile</button>
+        <button
+          style={{ background: g.weapon === 0 ? "#0f0" : "#444" }}
+          onClick={() => (g.weapon = 0)}
+        >
+          Cannon
+        </button>
+        <button
+          style={{ background: g.weapon === 1 ? "#0f0" : "#444" }}
+          onClick={() => (g.weapon = 1)}
+        >
+          Missile
+        </button>
 
         <button
           onClick={fire}
@@ -240,12 +332,28 @@ export default function App() {
             padding: "10px 20px",
             background: "#ff4444",
             color: "#fff",
-            border: "none",
           }}
         >
           FIRE 🔥
         </button>
+
+        <button onClick={() => (engineRef.current.state = initGame())}>
+          Restart
+        </button>
       </div>
+
+      {g.winner && (
+        <div
+          style={{
+            color: "#fff",
+            textAlign: "center",
+            padding: "10px",
+            fontSize: "20px",
+          }}
+        >
+          {g.winner} WINS 🏆
+        </div>
+      )}
     </div>
   );
 }
