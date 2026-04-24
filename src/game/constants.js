@@ -1,10 +1,11 @@
 export const WIDTH = 1000;
 export const HEIGHT = 600;
-export const GRAVITY = 0.25;
+export const GRAVITY = 0.2;
 
 export const WEAPONS = [
-  { name: "Basic", radius: 40, damage: 35, color: "yellow" },
-  { name: "Heavy", radius: 70, damage: 60, color: "orange" },
-  { name: "Cluster", radius: 90, damage: 25, color: "red" },
-  { name: "Rocket", radius: 60, damage: 45, color: "cyan" },
+  { name: "Cannon", radius: 30, damage: 25, color: "#facc15" },
+  { name: "Missile", radius: 50, damage: 35, color: "#fb7185" },
+  { name: "Cluster", radius: 25, damage: 15, color: "#a78bfa" },
+  { name: "Nuke", radius: 100, damage: 80, color: "#f97316" },
+  { name: "Laser", radius: 10, damage: 60, color: "#22d3ee" },
 ];

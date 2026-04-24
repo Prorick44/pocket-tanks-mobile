@@ -1,6 +1,12 @@
 export function generateTerrain() {
-  return Array.from(
-    { length: 1000 },
-    (_, i) => 420 + Math.sin(i * 0.012) * 60 + Math.sin(i * 0.03) * 25,
-  );
+  const terrain = [];
+  let h = 400;
+
+  for (let i = 0; i < 1000; i++) {
+    h += Math.random() * 4 - 2;
+    h = Math.max(320, Math.min(520, h));
+    terrain.push(h);
+  }
+
+  return terrain;
 }

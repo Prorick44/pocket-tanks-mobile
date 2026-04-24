@@ -1,36 +1,35 @@
-import { GRAVITY } from "./constants";
+export function updateProjectile(g, explode) {
+  const p = g.projectile;
+  if (!p) return false;
 
-export function updateProjectile(game, explode) {
-  if (!game.projectile) return;
+  p.vx += g.wind;
+  p.vy += 0.2;
 
-  let { x, y, vx, vy } = game.projectile;
+  p.x += p.vx;
+  p.y += p.vy;
 
-  vx += game.wind;
-  x += vx;
-  y += vy;
-  vy += GRAVITY;
-
-  game.trail = [...game.trail, { x, y }].slice(-40);
-
-  // 🚨 SAFE BOUNDS CHECK (IMPORTANT FIX)
-  if (x < 0 || x >= 1000) {
-    explode(Math.max(0, Math.min(999, x)), y);
-    return;
+  // tank hit
+  for (let t of g.tanks) {
+    if (Math.hypot(p.x - t.x, p.y - t.y) < 18) {
+      explode(g, p.x, p.y);
+      return false;
+    }
   }
 
-  const ix = Math.floor(x);
-
-  if (!game.terrain[ix]) {
-    explode(x, y);
-    return;
+  // terrain hit
+  const ix = Math.floor(p.x);
+  if (ix >= 0 && ix < g.terrain.length) {
+    if (p.y >= g.terrain[ix] && p.vy > 0) {
+      explode(g, p.x, g.terrain[ix]);
+      return false;
+    }
   }
 
-  const ground = game.terrain[ix];
-
-  if (y >= ground) {
-    explode(x, y);
-    return;
+  // out
+  if (p.x < 0 || p.x > g.terrain.length || p.y > 600) {
+    g.projectile = null;
+    return false;
   }
 
-  game.projectile = { x, y, vx, vy };
+  return true;
 }
