@@ -1,28 +1,22 @@
+import { generateTerrain } from "./terrain";
+
 export function initGame() {
-  const WIDTH = 800;
+  const terrain = generateTerrain();
 
   return {
+    turn: "player",
     tanks: [
-      { x: 100, y: 0, health: 100 },
-      { x: 700, y: 0, health: 100 },
+      { x: 150, y: terrain[150], health: 100, recoil: 0 },
+      { x: 850, y: terrain[850], health: 100, recoil: 0 },
     ],
-
-    terrain: Array.from(
-      { length: WIDTH },
-      (_, i) => 420 + Math.sin(i * 0.02) * 35,
-    ),
-
+    terrain,
     projectile: null,
     particles: [],
-
     angle: 45,
-    power: 10,
-    wind: (Math.random() - 0.5) * 0.2,
-
-    turn: "player",
+    power: 12,
     weapon: 0,
-
-    shake: 0,
+    wind: Math.random() * 0.2 - 0.1,
     winner: null,
+    shake: 0,
   };
 }
