@@ -10,20 +10,21 @@ export function updateProjectile(g, explode) {
   p.x += p.vx;
   p.y += p.vy;
 
-  // tank collision
+  // tank hit
   for (let t of g.tanks) {
-    const d = Math.hypot(p.x - t.x, p.y - t.y);
-    if (d < 14) {
+    if (Math.hypot(p.x - t.x, p.y - t.y) < 12) {
       explode(g, p.x, p.y);
+      g.projectile = null;
       return false;
     }
   }
 
-  // terrain collision
+  // terrain hit
   const ix = Math.floor(p.x);
   if (ix >= 0 && ix < g.terrain.length) {
     if (p.y >= g.terrain[ix]) {
       explode(g, p.x, g.terrain[ix]);
+      g.projectile = null;
       return false;
     }
   }

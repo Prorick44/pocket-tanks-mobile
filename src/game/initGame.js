@@ -18,5 +18,6 @@ export function initGame() {
     wind: Math.random() * 0.2 - 0.1,
     winner: null,
     shake: 0,
+    difficulty: "medium",
   };
 }

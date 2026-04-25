@@ -11,7 +11,6 @@ export default function App() {
   const rafRef = useRef(null);
 
   const [winner, setWinner] = useState(null);
-  const [msg, setMsg] = useState("");
 
   const engineRef = useRef({
     state: initGame(),
@@ -37,13 +36,11 @@ export default function App() {
       y: t.y - 10,
       vx: Math.cos(angle) * g.power,
       vy: -Math.sin(angle) * g.power,
+      trail: [],
     };
 
     t.recoil = 10;
     g.shake = 10;
-
-    setMsg("💥 FIRE!");
-    setTimeout(() => setMsg(""), 600);
   }
 
   /* ================= RESTART ================= */
@@ -51,33 +48,18 @@ export default function App() {
     engine().state = initGame();
     engine().aiLock = false;
     engine().aiming = false;
+    engine().start = null;
     setWinner(null);
-    setMsg("");
   }
 
   /* ================= UPDATE ================= */
   function update() {
     const g = engine().state;
 
-    // dynamic shake decay
-    g.shake = Math.max(0, g.shake - 0.4);
+    g.shake = Math.max(0, g.shake - 0.3);
 
     if (g.projectile) {
-      const flying = updateProjectile(g, (game, x, y) => {
-        explode(game, x, y);
-
-        const enemy = game.tanks[1];
-
-        const dist = Math.abs(enemy.x - x);
-
-        if (dist < 10) {
-          setMsg("🎯 PERFECT HIT!");
-        } else {
-          setMsg("💥 HIT!");
-        }
-
-        setTimeout(() => setMsg(""), 800);
-      });
+      const flying = updateProjectile(g, explode);
 
       if (!flying && !g.projectile && !g.winner) {
         setTimeout(() => {
@@ -85,6 +67,7 @@ export default function App() {
 
           if (g.turn === "ai" && !engine().aiLock) {
             engine().aiLock = true;
+
             setTimeout(() => {
               aiTurn(g, fire);
               engine().aiLock = false;
@@ -92,10 +75,6 @@ export default function App() {
           }
         }, 300);
       }
-    }
-
-    if (g.tanks[0].health <= 25 || g.tanks[1].health <= 25) {
-      g.lowHP = true;
     }
 
     if (g.winner && winner !== g.winner) {
@@ -135,6 +114,7 @@ export default function App() {
         0,
         Math.min(180, (Math.atan2(dy, dx) * 180) / Math.PI),
       );
+
       g.power = Math.min(20, Math.hypot(dx, dy) * 0.1);
     };
 
@@ -153,7 +133,7 @@ export default function App() {
     canvas.addEventListener("touchend", end);
   }, []);
 
-  /* ================= LOOP ================= */
+  /* ================= GAME LOOP ================= */
   useEffect(() => {
     const ctx = canvasRef.current.getContext("2d");
 
@@ -171,11 +151,12 @@ export default function App() {
 
   const weapons = ["Cannon", "Missile", "Cluster", "Nuke", "Laser"];
 
+  const setDifficulty = (level) => {
+    g.difficulty = level;
+  };
+
   return (
     <div style={styles.root}>
-      {/* MESSAGE POPUP */}
-      {msg && <div style={styles.msg}>{msg}</div>}
-
       {/* HUD */}
       <div style={styles.hud}>
         <div>Turn: {g.turn}</div>
@@ -184,8 +165,21 @@ export default function App() {
         <div>Wind: {g.wind.toFixed(2)}</div>
       </div>
 
-      {/* WIND ARROW */}
-      <div style={styles.windArrow}>{g.wind > 0 ? "➡️ WIND" : "⬅️ WIND"}</div>
+      {/* DIFFICULTY SELECT */}
+      <div style={styles.difficultyBar}>
+        {["easy", "medium", "hard"].map((d) => (
+          <button
+            key={d}
+            onClick={() => setDifficulty(d)}
+            style={{
+              ...styles.diffBtn,
+              background: g.difficulty === d ? "#00ff88" : "#222",
+            }}
+          >
+            {d.toUpperCase()}
+          </button>
+        ))}
+      </div>
 
       {/* RESTART */}
       <button onClick={restartGame} style={styles.restartBtn}>
@@ -265,29 +259,27 @@ const styles = {
     position: "absolute",
     top: 10,
     right: 10,
+    padding: "8px 12px",
     background: "#ff4d4d",
     border: "none",
-    padding: "8px 12px",
-    color: "white",
     borderRadius: 6,
+    color: "white",
     fontWeight: "bold",
   },
 
-  msg: {
-    position: "absolute",
-    top: "45%",
-    width: "100%",
-    textAlign: "center",
-    fontSize: 28,
-    color: "white",
-    zIndex: 20,
+  difficultyBar: {
+    display: "flex",
+    justifyContent: "center",
+    gap: 8,
+    padding: 6,
+    background: "#0b0b0b",
   },
 
-  windArrow: {
-    position: "absolute",
-    top: 50,
-    left: 10,
+  diffBtn: {
+    border: "none",
     color: "white",
+    padding: "5px 10px",
+    borderRadius: 6,
   },
 
   winner: {
