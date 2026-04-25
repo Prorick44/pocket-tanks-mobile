@@ -36,19 +36,16 @@ export default function App() {
       y: t.y - 10,
       vx: Math.cos(angle) * g.power,
       vy: -Math.sin(angle) * g.power,
-      trail: [],
     };
 
     t.recoil = 10;
     g.shake = 10;
   }
 
-  /* ================= RESTART ================= */
   function restartGame() {
     engine().state = initGame();
     engine().aiLock = false;
     engine().aiming = false;
-    engine().start = null;
     setWinner(null);
   }
 
@@ -90,8 +87,8 @@ export default function App() {
       const rect = canvas.getBoundingClientRect();
       const t = e.touches ? e.touches[0] : e;
       return {
-        x: t.clientX - rect.left,
-        y: t.clientY - rect.top,
+        x: (t.clientX - rect.left) * (WIDTH / rect.width),
+        y: (t.clientY - rect.top) * (600 / rect.height),
       };
     };
 
@@ -128,8 +125,8 @@ export default function App() {
     canvas.addEventListener("mousemove", move);
     canvas.addEventListener("mouseup", end);
 
-    canvas.addEventListener("touchstart", (e) => start(e.touches[0]));
-    canvas.addEventListener("touchmove", (e) => move(e.touches[0]));
+    canvas.addEventListener("touchstart", start);
+    canvas.addEventListener("touchmove", move);
     canvas.addEventListener("touchend", end);
   }, []);
 
@@ -151,10 +148,6 @@ export default function App() {
 
   const weapons = ["Cannon", "Missile", "Cluster", "Nuke", "Laser"];
 
-  const setDifficulty = (level) => {
-    g.difficulty = level;
-  };
-
   return (
     <div style={styles.root}>
       {/* HUD */}
@@ -162,39 +155,19 @@ export default function App() {
         <div>Turn: {g.turn}</div>
         <div>Angle: {Math.round(g.angle)}°</div>
         <div>Power: {Math.round(g.power)}</div>
-        <div>Wind: {g.wind.toFixed(2)}</div>
       </div>
 
-      {/* DIFFICULTY SELECT */}
-      <div style={styles.difficultyBar}>
-        {["easy", "medium", "hard"].map((d) => (
-          <button
-            key={d}
-            onClick={() => setDifficulty(d)}
-            style={{
-              ...styles.diffBtn,
-              background: g.difficulty === d ? "#00ff88" : "#222",
-            }}
-          >
-            {d.toUpperCase()}
-          </button>
-        ))}
+      {/* CANVAS WRAPPER (IMPORTANT FIX) */}
+      <div style={styles.canvasWrap}>
+        <canvas
+          ref={canvasRef}
+          width={WIDTH}
+          height={600}
+          style={styles.canvas}
+        />
       </div>
 
-      {/* RESTART */}
-      <button onClick={restartGame} style={styles.restartBtn}>
-        Restart 🔄
-      </button>
-
-      {/* CANVAS */}
-      <canvas
-        ref={canvasRef}
-        width={WIDTH}
-        height={600}
-        style={styles.canvas}
-      />
-
-      {/* WEAPONS */}
+      {/* WEAPONS (FIXED MOBILE BAR) */}
       <div style={styles.weaponBar}>
         {weapons.map((w, i) => (
           <button
@@ -210,76 +183,77 @@ export default function App() {
         ))}
       </div>
 
-      {/* WINNER */}
-      {winner && (
-        <div style={styles.winner}>🏆 {winner.toUpperCase()} WINS</div>
-      )}
+      {/* RESTART */}
+      <button onClick={restartGame} style={styles.restartBtn}>
+        Restart
+      </button>
+
+      {/* WIN */}
+      {winner && <div style={styles.winner}>{winner} WINS 🏆</div>}
     </div>
   );
 }
 
-/* ================= STYLES ================= */
+/* ================= STYLES (MOBILE FIX) ================= */
 const styles = {
   root: {
     height: "100vh",
-    background: "black",
     display: "flex",
     flexDirection: "column",
+    background: "black",
+    overflow: "hidden",
   },
 
   hud: {
     display: "flex",
     justifyContent: "space-around",
     color: "white",
-    padding: 8,
-    background: "#111",
+    padding: 6,
+    fontSize: 12,
+  },
+
+  canvasWrap: {
+    flex: 1,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    overflow: "hidden",
   },
 
   canvas: {
-    flex: 1,
     width: "100%",
+    maxWidth: "1000px",
+    height: "auto",
     touchAction: "none",
   },
 
   weaponBar: {
     display: "flex",
-    justifyContent: "space-around",
-    padding: 10,
+    overflowX: "auto",
+    gap: 6,
+    padding: 8,
     background: "#111",
   },
 
   weaponBtn: {
+    flex: "0 0 auto",
     color: "white",
     border: "none",
     padding: "6px 10px",
     borderRadius: 6,
+    fontSize: 12,
   },
 
   restartBtn: {
     position: "absolute",
     top: 10,
     right: 10,
-    padding: "8px 12px",
+    padding: "6px 10px",
     background: "#ff4d4d",
     border: "none",
-    borderRadius: 6,
     color: "white",
-    fontWeight: "bold",
-  },
-
-  difficultyBar: {
-    display: "flex",
-    justifyContent: "center",
-    gap: 8,
-    padding: 6,
-    background: "#0b0b0b",
-  },
-
-  diffBtn: {
-    border: "none",
-    color: "white",
-    padding: "5px 10px",
     borderRadius: 6,
+    fontSize: 12,
   },
 
   winner: {
@@ -287,7 +261,7 @@ const styles = {
     top: "40%",
     width: "100%",
     textAlign: "center",
-    fontSize: 32,
+    fontSize: 28,
     color: "white",
   },
 };
