@@ -1,13 +1,12 @@
-import { WEAPONS, GRAVITY } from "./constants";
+import { WEAPONS } from "./constants";
 
 export function draw(ctx, g) {
-  if (!g || !g.terrain) return;
+  if (!g) return;
 
   ctx.save();
-
   ctx.translate(
-    (Math.random() - 0.5) * (g.shake || 0),
-    (Math.random() - 0.5) * (g.shake || 0),
+    (Math.random() - 0.5) * g.shake,
+    (Math.random() - 0.5) * g.shake,
   );
 
   ctx.clearRect(0, 0, 1000, 600);
@@ -30,50 +29,27 @@ export function draw(ctx, g) {
   // tanks
   g.tanks.forEach((t, i) => {
     const ground = g.terrain[Math.floor(t.x)];
-    if (ground !== undefined) t.y = ground;
+    if (ground) t.y = ground;
 
-    const recoil = t.recoil || 0;
+    t.recoil *= 0.85;
 
     ctx.fillStyle = i === 0 ? "#22c55e" : "#ef4444";
-    ctx.fillRect(t.x - 18 - recoil, t.y - 12, 36, 12);
+    ctx.fillRect(t.x - 18 - t.recoil, t.y - 12, 36, 12);
 
     const angle = ((i === 0 ? g.angle : 180 - g.angle) * Math.PI) / 180;
-
-    const nx = t.x + Math.cos(angle) * 25;
-    const ny = t.y - 12 - Math.sin(angle) * 25;
 
     ctx.strokeStyle = "#fff";
     ctx.beginPath();
     ctx.moveTo(t.x, t.y - 12);
-    ctx.lineTo(nx, ny);
+    ctx.lineTo(t.x + Math.cos(angle) * 25, t.y - 12 - Math.sin(angle) * 25);
     ctx.stroke();
-    // ❤️ floating health bar
+
     ctx.fillStyle = "#000";
     ctx.fillRect(t.x - 20, t.y - 25, 40, 5);
 
     ctx.fillStyle = "#22c55e";
     ctx.fillRect(t.x - 20, t.y - 25, (t.health / 100) * 40, 5);
   });
-
-  // trajectory
-  if (g.turn === "player" && !g.projectile) {
-    let t = g.tanks[0];
-    let x = t.x;
-    let y = t.y - 10;
-
-    let vx = Math.cos((g.angle * Math.PI) / 180) * g.power;
-    let vy = -Math.sin((g.angle * Math.PI) / 180) * g.power;
-
-    ctx.fillStyle = "rgba(255,255,255,0.4)";
-
-    for (let i = 0; i < 25; i++) {
-      vx += g.wind;
-      x += vx;
-      y += vy;
-      vy += GRAVITY;
-      ctx.fillRect(x, y, 2, 2);
-    }
-  }
 
   // projectile
   if (g.projectile) {
@@ -87,14 +63,11 @@ export function draw(ctx, g) {
   g.particles.forEach((p) => {
     ctx.fillStyle = `rgba(255,150,0,${p.life / 40})`;
     ctx.fillRect(p.x, p.y, 3, 3);
-    p.x += p.vx;
-    p.y += p.vy;
     p.life--;
   });
 
   g.particles = g.particles.filter((p) => p.life > 0);
 
-  // UI
   ctx.fillStyle = "#fff";
   ctx.fillText(`Turn: ${g.turn}`, 20, 20);
 

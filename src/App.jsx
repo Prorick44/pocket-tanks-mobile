@@ -11,7 +11,7 @@ export default function App() {
   const rafRef = useRef(null);
 
   const [winner, setWinner] = useState(null);
-  const [gameUI, setGameUI] = useState({});
+  const [flash, setFlash] = useState(false);
 
   const engineRef = useRef({
     state: initGame(),
@@ -30,7 +30,7 @@ export default function App() {
     const isPlayer = g.turn === "player";
     const t = g.tanks[isPlayer ? 0 : 1];
 
-    const angle = ((isPlayer ? g.angle : 180 - g.angle) * Math.PI) / 180;
+    const angle = (g.angle * Math.PI) / 180;
 
     g.projectile = {
       x: t.x,
@@ -40,45 +40,51 @@ export default function App() {
       trail: [],
     };
 
-    t.recoil = 8;
-    g.shake = 8;
+    t.recoil = 10;
+    g.shake = 10;
+
+    // 🔥 explosion flash trigger
+    setFlash(true);
+    setTimeout(() => setFlash(false), 120);
+  }
+
+  /* ================= RESTART ================= */
+  function restartGame() {
+    engine().state = initGame();
+    engine().aiLock = false;
+    engine().aiming = false;
+    engine().start = null;
+    setWinner(null);
   }
 
   /* ================= UPDATE ================= */
   function update() {
-    const eng = engine();
-    const g = eng.state;
+    const g = engine().state;
 
-    g.shake = Math.max(0, g.shake - 0.25);
+    g.shake = Math.max(0, g.shake - 0.3);
 
     if (g.projectile) {
-      g.projectile.trail.push({ x: g.projectile.x, y: g.projectile.y });
-      if (g.projectile.trail.length > 12) g.projectile.trail.shift();
-
       const flying = updateProjectile(g, explode);
 
       if (!flying && !g.projectile && !g.winner) {
         setTimeout(() => {
           g.turn = g.turn === "player" ? "ai" : "player";
 
-          if (g.turn === "ai" && !eng.aiLock) {
-            eng.aiLock = true;
+          if (g.turn === "ai" && !engine().aiLock) {
+            engine().aiLock = true;
+
             setTimeout(() => {
               aiTurn(g, fire);
-              eng.aiLock = false;
+              engine().aiLock = false;
             }, 600);
           }
-        }, 400);
+        }, 300);
       }
     }
 
-    setGameUI({
-      playerHP: Math.max(0, g.tanks[0].health),
-      aiHP: Math.max(0, g.tanks[1].health),
-      wind: g.wind,
-      weapon: g.weapon,
-      turn: g.turn,
-    });
+    if (g.tanks[0].health <= 25 || g.tanks[1].health <= 25) {
+      g.lowHP = true;
+    }
 
     if (g.winner && winner !== g.winner) {
       setWinner(g.winner);
@@ -93,8 +99,8 @@ export default function App() {
       const rect = canvas.getBoundingClientRect();
       const t = e.touches ? e.touches[0] : e;
       return {
-        x: (t.clientX - rect.left) * (WIDTH / rect.width),
-        y: (t.clientY - rect.top) * (600 / rect.height),
+        x: t.clientX - rect.left,
+        y: t.clientY - rect.top,
       };
     };
 
@@ -117,7 +123,7 @@ export default function App() {
         0,
         Math.min(180, (Math.atan2(dy, dx) * 180) / Math.PI),
       );
-      g.power = Math.max(2, Math.min(20, Math.hypot(dx, dy) * 0.1));
+      g.power = Math.min(20, Math.hypot(dx, dy) * 0.1);
     };
 
     const end = () => {
@@ -130,8 +136,8 @@ export default function App() {
     canvas.addEventListener("mousemove", move);
     canvas.addEventListener("mouseup", end);
 
-    canvas.addEventListener("touchstart", start);
-    canvas.addEventListener("touchmove", move);
+    canvas.addEventListener("touchstart", (e) => start(e.touches[0]));
+    canvas.addEventListener("touchmove", (e) => move(e.touches[0]));
     canvas.addEventListener("touchend", end);
   }, []);
 
@@ -141,18 +147,7 @@ export default function App() {
 
     const loop = () => {
       update();
-
-      const g = engine().state;
-
-      // screen shake
-      ctx.save();
-      const shakeX = (Math.random() - 0.5) * g.shake;
-      const shakeY = (Math.random() - 0.5) * g.shake;
-      ctx.translate(shakeX, shakeY);
-
-      draw(ctx, g);
-      ctx.restore();
-
+      draw(ctx, engine().state);
       rafRef.current = requestAnimationFrame(loop);
     };
 
@@ -160,25 +155,35 @@ export default function App() {
     return () => cancelAnimationFrame(rafRef.current);
   }, []);
 
-  const isPortrait = window.innerHeight > window.innerWidth;
+  const g = engine().state;
 
-  if (isPortrait) {
-    return <div style={styles.rotate}>Rotate your device 🔄</div>;
-  }
-
-  const weaponNames = ["Cannon", "Missile", "Cluster", "Nuke", "Laser"];
+  const weapons = ["Cannon", "Missile", "Cluster", "Nuke", "Laser"];
 
   return (
     <div style={styles.root}>
-      {/* HUD */}
+      {/* FLASH EFFECT */}
+      {flash && <div style={styles.flash} />}
+
+      {/* TOP HUD */}
       <div style={styles.hud}>
-        <Health label="PLAYER" hp={gameUI.playerHP} color="#00ff88" />
-        <div style={styles.centerHUD}>
-          <div>🌬️ {gameUI.wind?.toFixed(2)}</div>
-          <div style={{ opacity: 0.7 }}>{weaponNames[gameUI.weapon]}</div>
+        <div style={{ color: g.turn === "player" ? "#00ff88" : "#fff" }}>
+          PLAYER TURN
         </div>
-        <Health label="AI" hp={gameUI.aiHP} color="#ff4d4d" />
+
+        <div>Angle: {Math.round(g.angle)}°</div>
+        <div>Power: {Math.round(g.power)}</div>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          🌬️ {g.wind.toFixed(2)}
+        </div>
+
+        <div>Weapon: {weapons[g.weapon]}</div>
       </div>
+
+      {/* RESTART */}
+      <button onClick={restartGame} style={styles.restartBtn}>
+        Restart 🔄
+      </button>
 
       {/* CANVAS */}
       <canvas
@@ -188,16 +193,15 @@ export default function App() {
         style={styles.canvas}
       />
 
-      {/* WEAPONS */}
+      {/* WEAPON SELECT */}
       <div style={styles.weaponBar}>
-        {weaponNames.map((w, i) => (
+        {weapons.map((w, i) => (
           <button
             key={i}
-            onClick={() => (engine().state.weapon = i)}
+            onClick={() => (g.weapon = i)}
             style={{
               ...styles.weaponBtn,
-              background: gameUI.weapon === i ? "#00ff88" : "#222",
-              transform: gameUI.weapon === i ? "scale(1.1)" : "scale(1)",
+              background: g.weapon === i ? "#00ff88" : "#222",
             }}
           >
             {w}
@@ -213,86 +217,73 @@ export default function App() {
   );
 }
 
-/* ================= UI COMPONENT ================= */
-function Health({ label, hp, color }) {
-  return (
-    <div style={{ width: 140 }}>
-      <div style={{ fontSize: 12 }}>{label}</div>
-      <div style={styles.hpBarBg}>
-        <div
-          style={{
-            ...styles.hpBarFill,
-            width: `${hp}%`,
-            background: color,
-          }}
-        />
-      </div>
-    </div>
-  );
-}
-
 /* ================= STYLES ================= */
 const styles = {
   root: {
     height: "100vh",
-    background: "radial-gradient(circle, #111, #000)",
+    background: "black",
     display: "flex",
     flexDirection: "column",
   },
+
   hud: {
     display: "flex",
-    justifyContent: "space-between",
-    padding: 10,
-    color: "#fff",
-    alignItems: "center",
-  },
-  centerHUD: {
-    textAlign: "center",
+    justifyContent: "space-around",
+    color: "white",
+    padding: 8,
+    background: "#111",
     fontSize: 14,
   },
+
   canvas: {
-    width: "100%",
     flex: 1,
+    width: "100%",
     touchAction: "none",
   },
+
   weaponBar: {
     display: "flex",
     justifyContent: "space-around",
     padding: 10,
     background: "#111",
   },
+
   weaponBtn: {
-    color: "#fff",
+    color: "white",
     border: "none",
-    padding: "8px 10px",
+    padding: "6px 10px",
     borderRadius: 6,
-    transition: "0.2s",
   },
-  hpBarBg: {
-    height: 8,
-    background: "#333",
-    borderRadius: 4,
-    overflow: "hidden",
+
+  restartBtn: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    padding: "8px 12px",
+    background: "#ff4d4d",
+    border: "none",
+    borderRadius: 6,
+    color: "white",
+    fontWeight: "bold",
+    zIndex: 10,
   },
-  hpBarFill: {
-    height: "100%",
-    transition: "0.3s",
-  },
+
   winner: {
     position: "absolute",
     top: "40%",
     width: "100%",
     textAlign: "center",
     fontSize: 32,
-    color: "#fff",
-    animation: "pop 0.6s ease-out",
+    color: "white",
   },
-  rotate: {
-    color: "#fff",
-    height: "100vh",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    background: "#000",
+
+  flash: {
+    position: "absolute",
+    width: "100%",
+    height: "100%",
+    background: "white",
+    opacity: 0.15,
+    zIndex: 5,
+    pointerEvents: "none",
   },
 };

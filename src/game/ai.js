@@ -4,8 +4,10 @@ export function aiTurn(g, fire) {
 
   const dx = player.x - ai.x;
 
-  g.angle = 45 + Math.random() * 20;
-  g.power = Math.min(20, Math.abs(dx) * 0.1 + 6);
+  const distanceFactor = Math.min(20, Math.abs(dx) * 0.05);
 
-  setTimeout(fire, 500);
+  g.angle = 140 - Math.min(80, Math.abs(dx) * 0.05);
+  g.power = Math.min(20, 8 + distanceFactor);
+
+  setTimeout(() => fire(), 600);
 }
