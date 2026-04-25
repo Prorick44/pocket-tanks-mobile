@@ -11,6 +11,7 @@ export default function App() {
   const rafRef = useRef(null);
 
   const [winner, setWinner] = useState(null);
+  const [scale, setScale] = useState(1);
 
   const engineRef = useRef({
     state: initGame(),
@@ -20,6 +21,24 @@ export default function App() {
   });
 
   const engine = () => engineRef.current;
+
+  /* ================= RESPONSIVE SCALE ================= */
+  useEffect(() => {
+    const handleResize = () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+
+      const scaleX = w / 1000;
+      const scaleY = h / 600;
+
+      setScale(Math.min(scaleX, scaleY));
+    };
+
+    handleResize();
+    window.addEventListener("resize", handleResize);
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   /* ================= FIRE ================= */
   function fire() {
@@ -40,13 +59,6 @@ export default function App() {
 
     t.recoil = 10;
     g.shake = 10;
-  }
-
-  function restartGame() {
-    engine().state = initGame();
-    engine().aiLock = false;
-    engine().aiming = false;
-    setWinner(null);
   }
 
   /* ================= UPDATE ================= */
@@ -86,8 +98,9 @@ export default function App() {
     const getPos = (e) => {
       const rect = canvas.getBoundingClientRect();
       const t = e.touches ? e.touches[0] : e;
+
       return {
-        x: (t.clientX - rect.left) * (WIDTH / rect.width),
+        x: (t.clientX - rect.left) * (1000 / rect.width),
         y: (t.clientY - rect.top) * (600 / rect.height),
       };
     };
@@ -125,12 +138,12 @@ export default function App() {
     canvas.addEventListener("mousemove", move);
     canvas.addEventListener("mouseup", end);
 
-    canvas.addEventListener("touchstart", start);
-    canvas.addEventListener("touchmove", move);
-    canvas.addEventListener("touchend", end);
+    canvas.addEventListener("touchstart", start, { passive: true });
+    canvas.addEventListener("touchmove", move, { passive: true });
+    canvas.addEventListener("touchend", end, { passive: true });
   }, []);
 
-  /* ================= GAME LOOP ================= */
+  /* ================= LOOP ================= */
   useEffect(() => {
     const ctx = canvasRef.current.getContext("2d");
 
@@ -157,17 +170,20 @@ export default function App() {
         <div>Power: {Math.round(g.power)}</div>
       </div>
 
-      {/* CANVAS WRAPPER (IMPORTANT FIX) */}
-      <div style={styles.canvasWrap}>
+      {/* GAME AREA */}
+      <div style={styles.gameArea}>
         <canvas
           ref={canvasRef}
-          width={WIDTH}
+          width={1000}
           height={600}
-          style={styles.canvas}
+          style={{
+            transform: `scale(${scale})`,
+            transformOrigin: "top center",
+          }}
         />
       </div>
 
-      {/* WEAPONS (FIXED MOBILE BAR) */}
+      {/* WEAPONS */}
       <div style={styles.weaponBar}>
         {weapons.map((w, i) => (
           <button
@@ -183,21 +199,17 @@ export default function App() {
         ))}
       </div>
 
-      {/* RESTART */}
-      <button onClick={restartGame} style={styles.restartBtn}>
-        Restart
-      </button>
-
       {/* WIN */}
       {winner && <div style={styles.winner}>{winner} WINS 🏆</div>}
     </div>
   );
 }
 
-/* ================= STYLES (MOBILE FIX) ================= */
+/* ================= RESPONSIVE STYLES ================= */
 const styles = {
   root: {
     height: "100vh",
+    width: "100vw",
     display: "flex",
     flexDirection: "column",
     background: "black",
@@ -208,11 +220,12 @@ const styles = {
     display: "flex",
     justifyContent: "space-around",
     color: "white",
-    padding: 6,
-    fontSize: 12,
+    padding: "6px",
+    fontSize: "12px",
+    flexShrink: 0,
   },
 
-  canvasWrap: {
+  gameArea: {
     flex: 1,
     display: "flex",
     justifyContent: "center",
@@ -220,40 +233,22 @@ const styles = {
     overflow: "hidden",
   },
 
-  canvas: {
-    width: "100%",
-    maxWidth: "1000px",
-    height: "auto",
-    touchAction: "none",
-  },
-
   weaponBar: {
     display: "flex",
     overflowX: "auto",
-    gap: 6,
-    padding: 8,
+    gap: "8px",
+    padding: "10px",
     background: "#111",
+    flexShrink: 0,
   },
 
   weaponBtn: {
     flex: "0 0 auto",
     color: "white",
     border: "none",
-    padding: "6px 10px",
-    borderRadius: 6,
-    fontSize: 12,
-  },
-
-  restartBtn: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    padding: "6px 10px",
-    background: "#ff4d4d",
-    border: "none",
-    color: "white",
-    borderRadius: 6,
-    fontSize: 12,
+    padding: "8px 12px",
+    borderRadius: "6px",
+    fontSize: "12px",
   },
 
   winner: {
@@ -261,7 +256,7 @@ const styles = {
     top: "40%",
     width: "100%",
     textAlign: "center",
-    fontSize: 28,
+    fontSize: "28px",
     color: "white",
   },
 };
