@@ -19,14 +19,18 @@ export function explode(game, x, y) {
     }
   });
 
-  // particles
-  for (let i = 0; i < 40; i++) {
+  // particles (UPGRADED)
+  for (let i = 0; i < 60; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 6;
+
     game.particles.push({
       x,
       y,
-      vx: (Math.random() - 0.5) * 8,
-      vy: (Math.random() - 0.5) * 8,
-      life: 40,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 50 + Math.random() * 20,
+      color: ["#ffcc00", "#ff6600", "#ff3300"][Math.floor(Math.random() * 3)],
     });
   }
 
@@ -40,7 +44,7 @@ export function explode(game, x, y) {
     });
   }
 
-  game.shake = 10;
+  game.shake = 12;
 
   if (game.tanks[0].health <= 0) game.winner = "AI";
   if (game.tanks[1].health <= 0) game.winner = "PLAYER";

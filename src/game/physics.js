@@ -12,7 +12,8 @@ export function updateProjectile(g, explode) {
 
   // tank hit
   for (let t of g.tanks) {
-    if (Math.hypot(p.x - t.x, p.y - t.y) < 12) {
+    const d = Math.hypot(p.x - t.x, p.y - t.y);
+    if (d < 12) {
       explode(g, p.x, p.y);
       g.projectile = null;
       return false;
