@@ -11,7 +11,7 @@ export default function App() {
   const rafRef = useRef(null);
 
   const [winner, setWinner] = useState(null);
-  const [flash, setFlash] = useState(false);
+  const [msg, setMsg] = useState("");
 
   const engineRef = useRef({
     state: initGame(),
@@ -37,15 +37,13 @@ export default function App() {
       y: t.y - 10,
       vx: Math.cos(angle) * g.power,
       vy: -Math.sin(angle) * g.power,
-      trail: [],
     };
 
     t.recoil = 10;
     g.shake = 10;
 
-    // 🔥 explosion flash trigger
-    setFlash(true);
-    setTimeout(() => setFlash(false), 120);
+    setMsg("💥 FIRE!");
+    setTimeout(() => setMsg(""), 600);
   }
 
   /* ================= RESTART ================= */
@@ -53,18 +51,33 @@ export default function App() {
     engine().state = initGame();
     engine().aiLock = false;
     engine().aiming = false;
-    engine().start = null;
     setWinner(null);
+    setMsg("");
   }
 
   /* ================= UPDATE ================= */
   function update() {
     const g = engine().state;
 
-    g.shake = Math.max(0, g.shake - 0.3);
+    // dynamic shake decay
+    g.shake = Math.max(0, g.shake - 0.4);
 
     if (g.projectile) {
-      const flying = updateProjectile(g, explode);
+      const flying = updateProjectile(g, (game, x, y) => {
+        explode(game, x, y);
+
+        const enemy = game.tanks[1];
+
+        const dist = Math.abs(enemy.x - x);
+
+        if (dist < 10) {
+          setMsg("🎯 PERFECT HIT!");
+        } else {
+          setMsg("💥 HIT!");
+        }
+
+        setTimeout(() => setMsg(""), 800);
+      });
 
       if (!flying && !g.projectile && !g.winner) {
         setTimeout(() => {
@@ -72,7 +85,6 @@ export default function App() {
 
           if (g.turn === "ai" && !engine().aiLock) {
             engine().aiLock = true;
-
             setTimeout(() => {
               aiTurn(g, fire);
               engine().aiLock = false;
@@ -161,24 +173,19 @@ export default function App() {
 
   return (
     <div style={styles.root}>
-      {/* FLASH EFFECT */}
-      {flash && <div style={styles.flash} />}
+      {/* MESSAGE POPUP */}
+      {msg && <div style={styles.msg}>{msg}</div>}
 
-      {/* TOP HUD */}
+      {/* HUD */}
       <div style={styles.hud}>
-        <div style={{ color: g.turn === "player" ? "#00ff88" : "#fff" }}>
-          PLAYER TURN
-        </div>
-
+        <div>Turn: {g.turn}</div>
         <div>Angle: {Math.round(g.angle)}°</div>
         <div>Power: {Math.round(g.power)}</div>
-
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          🌬️ {g.wind.toFixed(2)}
-        </div>
-
-        <div>Weapon: {weapons[g.weapon]}</div>
+        <div>Wind: {g.wind.toFixed(2)}</div>
       </div>
+
+      {/* WIND ARROW */}
+      <div style={styles.windArrow}>{g.wind > 0 ? "➡️ WIND" : "⬅️ WIND"}</div>
 
       {/* RESTART */}
       <button onClick={restartGame} style={styles.restartBtn}>
@@ -193,7 +200,7 @@ export default function App() {
         style={styles.canvas}
       />
 
-      {/* WEAPON SELECT */}
+      {/* WEAPONS */}
       <div style={styles.weaponBar}>
         {weapons.map((w, i) => (
           <button
@@ -232,7 +239,6 @@ const styles = {
     color: "white",
     padding: 8,
     background: "#111",
-    fontSize: 14,
   },
 
   canvas: {
@@ -259,13 +265,29 @@ const styles = {
     position: "absolute",
     top: 10,
     right: 10,
-    padding: "8px 12px",
     background: "#ff4d4d",
     border: "none",
-    borderRadius: 6,
+    padding: "8px 12px",
     color: "white",
+    borderRadius: 6,
     fontWeight: "bold",
-    zIndex: 10,
+  },
+
+  msg: {
+    position: "absolute",
+    top: "45%",
+    width: "100%",
+    textAlign: "center",
+    fontSize: 28,
+    color: "white",
+    zIndex: 20,
+  },
+
+  windArrow: {
+    position: "absolute",
+    top: 50,
+    left: 10,
+    color: "white",
   },
 
   winner: {
@@ -275,15 +297,5 @@ const styles = {
     textAlign: "center",
     fontSize: 32,
     color: "white",
-  },
-
-  flash: {
-    position: "absolute",
-    width: "100%",
-    height: "100%",
-    background: "white",
-    opacity: 0.15,
-    zIndex: 5,
-    pointerEvents: "none",
   },
 };
